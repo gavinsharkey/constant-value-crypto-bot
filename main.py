@@ -30,7 +30,7 @@ class Bot():
 
         while True:
             amount_asset_balance = address.balance()
-            amount_asset_price = float(amount_price_pair.last()) # Denormalized
+            amount_asset_price = amount_price_pair.ticker()['data']['lastPrice'] # Denormalized
 
             # Find value of user's WAVES in USDN
             amount_asset_balance_denormalized = float(amount_asset_balance) * 10 ** -(self.amount_asset.decimals)
