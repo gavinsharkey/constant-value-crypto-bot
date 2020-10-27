@@ -29,6 +29,8 @@ class Bot():
         prev_order = None
 
         while True:
+            print('\n')
+
             amount_asset_balance = address.balance()
             amount_asset_price = amount_price_pair.ticker()['data']['lastPrice'] # Denormalized
 
