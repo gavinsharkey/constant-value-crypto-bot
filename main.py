@@ -11,7 +11,7 @@ class Bot():
         self.node = "https://nodes.waves.exchange"
         self.chain = "mainnet"
         self.matcher = "https://waves.exchange/api/v1/forward/matcher"
-        self.amount_asset = pw.WAVES
+        self.amount_asset = pw.Asset(os.environ.get('AMOUNT_ASSET') or '')
         self.order_fee = int(0.003 * 10 ** 8)
         self.time_to_sleep = float(os.environ.get('SECONDS_TO_WAIT'))
         self.target_value = float(os.environ.get('TARGET_VALUE'))
@@ -25,37 +25,43 @@ class Bot():
 
     def run(self):
         address = pw.Address(privateKey=self.private_key)
-        waves_usdn = pw.AssetPair(self.amount_asset, self.price_asset)
+        amount_price_pair = pw.AssetPair(self.amount_asset, self.price_asset)
         prev_order = None
 
         while True:
-            waves_balance = address.balance() # WAVES (10 ** 8)
-            waves_price = float(waves_usdn.last()) # Denormalized
+            amount_asset_balance = address.balance()
+            amount_asset_price = float(amount_price_pair.last()) # Denormalized
 
             # Find value of user's WAVES in USDN
-            waves_balance_denormalized = float(waves_balance) * (10 ** -8)
-            value_of_users_waves = waves_balance_denormalized * waves_price
+            amount_asset_balance_denormalized = float(amount_asset_balance) * 10 ** -(self.amount_asset.decimals)
+            current_amount_asset_value = amount_asset_balance_denormalized * amount_asset_price
 
             # Calculate difference and value to sell/buy
-            difference = abs(value_of_users_waves - self.target_value)
-            to_exchange = int((difference / waves_price) * 10 ** 8)
+            difference = abs(current_amount_asset_value - self.target_value)
+            to_exchange = int((difference / amount_asset_price) * 10 ** self.amount_asset.decimals)
 
             if difference > self.threshold_value:
                 if prev_order:
                     prev_order.cancel()
 
-                if value_of_users_waves > self.target_value:
-                    print("Waves Price: ", waves_price)
-                    print("Waves Balance (pre-sell): ", waves_balance)
+                if current_amount_asset_value > self.target_value:
+                    print("Waves Price: ", amount_asset_price)
+                    print("Waves Balance (pre-sell): ", amount_asset_balance)
                     print("To Sell: ", to_exchange - self.order_fee)
 
-                    prev_order = address.sell(assetPair=waves_usdn, amount=to_exchange - self.order_fee, price=waves_price, matcherFee=self.order_fee)
-                elif value_of_users_waves < self.target_value:
-                    print("Waves Price: ", waves_price)
-                    print("Waves Balance (pre-buy): ", waves_balance)
+                    prev_order = address.sell(assetPair=amount_price_pair, 
+                        amount=to_exchange - self.order_fee, 
+                        price=amount_asset_price, 
+                        matcherFee=self.order_fee)
+                elif current_amount_asset_value < self.target_value:
+                    print("Waves Price: ", amount_asset_price)
+                    print("Waves Balance (pre-buy): ", amount_asset_balance)
                     print('To Buy: ', to_exchange + self.order_fee)
                     
-                    prev_order = address.buy(assetPair=waves_usdn, amount=to_exchange + self.order_fee, price=waves_price, matcherFee=self.order_fee)
+                    prev_order = address.buy(assetPair=amount_price_pair, 
+                        amount=to_exchange + self.order_fee, 
+                        price=amount_asset_price, 
+                        matcherFee=self.order_fee)
                 print("Order: ", prev_order.status())
             else:
                 print('Pass: Threshold has not been reached')
